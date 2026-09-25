@@ -1,0 +1,67 @@
+{
+  "name": "09 Alertas de error",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.errorTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "1de39f96-9581-42f4-891f-cebef1e293dd",
+      "name": "Error Trigger"
+    },
+    {
+      "parameters": {
+        "chatId": "5890459935",
+        "text": "=⚠️ Error en {{ $json.workflow.name }}\n\nNodo: {{ $json.execution.lastNodeExecuted }}\nMensaje: {{ $json.execution.error.message }}\nHora: {{ $now.setZone('America/Costa_Rica').toFormat('dd/MM/yyyy HH:mm') }}\n\nVer ejecución: {{ $json.execution.url }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        208,
+        0
+      ],
+      "id": "6d0ad27b-0dc6-43d6-bd45-51a1ad069a5d",
+      "name": "Alertar por Telegram",
+      "webhookId": "079b4ff2-fd3f-4464-ace3-627cd3c08c42",
+      "credentials": {
+        "telegramApi": {
+          "id": "MU3JTPoUuT6Zo8BL",
+          "name": "Telegram News Reporter"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Error Trigger": {
+      "main": [
+        [
+          {
+            "node": "Alertar por Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "c03e1b61-c865-4a68-89e9-1ef5ce3b9367",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c07b4837175c9f25db863c711250b6e9f92cdaefee696f7ecced475db5bd16cf"
+  },
+  "nodeGroups": [],
+  "id": "fcs8caem8tmPLFyq",
+  "tags": []
+}

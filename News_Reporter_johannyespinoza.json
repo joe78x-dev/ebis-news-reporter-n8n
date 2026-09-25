@@ -1,0 +1,558 @@
+{
+  "name": "08 News Reporter",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -400,
+        -512
+      ],
+      "id": "16262a0f-dee2-4925-9d68-e3a3b5742ac0",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -400,
+        -320
+      ],
+      "id": "b346eaa2-0840-4fc3-8bce-b8a3e2c4e3d8",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "https://feeds.elpais.com/mrss-s/pages/ep/site/elpais.com/section/tecnologia/portada",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -176,
+        -416
+      ],
+      "id": "81577d9e-3f9d-44aa-af9b-db60315098a7",
+      "name": "Obtener RSS El País",
+      "retryOnFail": true,
+      "waitBetweenTries": 2000
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.xml",
+      "typeVersion": 1,
+      "position": [
+        48,
+        -416
+      ],
+      "id": "4554f499-f4fd-42b5-b366-fbbc468fa00e",
+      "name": "Parsear XML"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.first().json.rss.channel.item;\nconst lista = Array.isArray(items) ? items : [items];\n\nconst limpiarHTML = (html = '') => String(html)\n  .replace(/<[^>]*>/g, ' ')\n  .replace(/Seguir leyendo/gi, '')\n  .replace(/&nbsp;/g, ' ')\n  .replace(/&amp;/g, '&')\n  .replace(/&quot;/g, '\"')\n  .replace(/\\s+/g, ' ')\n  .trim();\n\nconst validas = lista\n  .filter(n => n.link && n.link.includes('/tecnologia/') && !n.link.includes('/branded/'))\n  .sort((a, b) => new Date(b.pubDate) - new Date(a.pubDate));\n\nif (validas.length === 0) {\n  throw new Error('No hay noticias válidas de tecnología en el feed');\n}\n\nconst n = validas[0];\n\nreturn [{\n  json: {\n    titulo: String(n.title).trim(),\n    subtitulo: String(n.description || '').trim(),\n    contenido: limpiarHTML(n['content:encoded']),\n    link: n.link,\n    fecha: n.pubDate,\n    autor: String(n['dc:creator'] || '').trim(),\n    categorias: [].concat(n.category || [])\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        -416
+      ],
+      "id": "8fd0771f-16aa-4dc2-99b9-ec0881c36bc3",
+      "name": "Seleccionar noticia"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Noticia original de EL PAÍS:\n\nTitular: {{ $json.titulo }}\nSubtítulo: {{ $json.subtitulo }}\nContenido: {{ $json.contenido }}\nAutor: {{ $json.autor }}\nFecha: {{ $json.fecha }}\nCategorías: {{ $json.categorias.join(', ') }}\nEnlace: {{ $json.link }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Eres el redactor jefe de una empresa digital que publica noticias y análisis sobre innovación, tecnología y negocios para un público general hispanohablante.\n\nTu tarea es transformar la noticia recibida en una pieza lista para distribuir.\n\nReglas de contenido:\n- Usa solo la información de la noticia. No inventes datos, cifras ni declaraciones.\n- Tono informativo, cercano y divulgativo: frases claras, sin tecnicismos innecesarios; si usas uno, explícalo en pocas palabras.\n- Escribe en español neutro.\n\nQué debes generar:\n1. titular: reescrito, atractivo y fiel a la noticia, máximo 90 caracteres.\n2. resumen: 2 o 3 párrafos cortos, máximo 120 palabras en total.\n3. por_que_importa: una sola frase que explique el impacto para el lector o para los negocios.\n4. hashtags: un solo texto con 3 hashtags en español separados por un espacio, por ejemplo: #Tecnologia #Innovacion #Negocios.\n5. prompt_imagen: en inglés, para un generador de imágenes. Estilo ilustración editorial moderna y conceptual, colores sobrios, composición limpia. Representa la idea central de la noticia de forma simbólica. Prohibido: texto dentro de la imagen, logotipos de marcas y personas reales identificables."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        496,
+        -416
+      ],
+      "id": "167730b0-b656-4bd8-9a3a-ce7dc433e735",
+      "name": "Redactor IA"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4o-mini"
+        },
+        "builtInTools": {},
+        "options": {
+          "temperature": 0.5
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        576,
+        16
+      ],
+      "id": "dbd7b5c7-40e6-4a6f-8772-2feedd74aa31",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "Cf4e1dM8xxs8o5Kz",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"titular\": \"Titular reescrito de la noticia\",\n  \"resumen\": \"Párrafo uno del resumen. Párrafo dos del resumen.\",\n  \"por_que_importa\": \"Frase que explica el impacto para el lector.\",\n  \"prompt_imagen\": \"Editorial conceptual illustration of...\",\n  \"hashtags\": \"#Tecnologia #Innovacion #Negocios\"\n}",
+        "autoFix": true
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        576,
+        -192
+      ],
+      "id": "3a6cb548-c532-4843-8c54-ea566f0b2936",
+      "name": "salida en JSON"
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-image-1-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-IMAGE-1-MINI"
+        },
+        "prompt": "={{ $json.output.prompt_imagen }}",
+        "options": {
+          "quality": "medium",
+          "size": "1024x1024"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        944,
+        -416
+      ],
+      "id": "bb51fc66-5c51-4570-b7c3-8a1001e5b201",
+      "name": "Generar imagen",
+      "credentials": {
+        "openAiApi": {
+          "id": "Cf4e1dM8xxs8o5Kz",
+          "name": "OpenAI account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "sendPhoto",
+        "chatId": "5890459935",
+        "binaryData": true,
+        "additionalFields": {
+          "caption": "=📰 {{ $('Redactor IA').item.json.output.titular }}\n\n{{ $('Redactor IA').item.json.output.hashtags }}"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1264,
+        -624
+      ],
+      "id": "64da9a5a-3fb1-46bb-a49f-33783f263f97",
+      "name": "Enviar imagen Telegram",
+      "webhookId": "fcaa1a15-1ac4-4a00-b068-61ee1fb60179",
+      "credentials": {
+        "telegramApi": {
+          "id": "MU3JTPoUuT6Zo8BL",
+          "name": "Telegram News Reporter"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "5890459935",
+        "text": "=🧠 Resumen\n\n{{ $('Redactor IA').item.json.output.resumen }}\n\n💡 Por qué importa: {{ $('Redactor IA').item.json.output.por_que_importa }}\n\n🖼️ Imagen: {{ $('Subir imagen ImgBB').item.json.data.url }}\n\n🔗 Fuente: EL PAÍS\n{{ $('Seleccionar noticia').item.json.link }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1552,
+        -448
+      ],
+      "id": "768833ba-29fd-4a6e-8bd0-1a0315fbfb95",
+      "name": "Enviar resumen Telegram",
+      "webhookId": "8426f4de-f74c-459b-acbd-384d45364846",
+      "credentials": {
+        "telegramApi": {
+          "id": "MU3JTPoUuT6Zo8BL",
+          "name": "Telegram News Reporter"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.imgbb.com/1/upload",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpQueryAuth",
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "image",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1248,
+        -432
+      ],
+      "id": "db20e174-cfb9-4f6b-9571-e8da714afc76",
+      "name": "Subir imagen ImgBB",
+      "retryOnFail": true,
+      "waitBetweenTries": 2000,
+      "credentials": {
+        "httpQueryAuth": {
+          "id": "4SXucLiH4Wq2jQ9n",
+          "name": "ImgBB API"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "chatId": "5890459935",
+        "text": "=📰 {{ $('Redactor IA').item.json.output.titular }}\n\n🧠 Resumen\n\n{{ $('Redactor IA').item.json.output.resumen }}\n\n💡 Por qué importa: {{ $('Redactor IA').item.json.output.por_que_importa }}\n\n⚠️ Imagen no disponible en esta edición.\n\n🔗 Fuente: EL PAÍS\n{{ $('Seleccionar noticia').item.json.link }}\n\n{{ $('Redactor IA').item.json.output.hashtags }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "disable_web_page_preview": true
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1424,
+        -288
+      ],
+      "id": "3065cb29-ae9b-4198-868d-28607288f4f2",
+      "name": "Enviar solo texto (fallback)",
+      "webhookId": "0b7961c3-2496-42d6-936b-1b3f463d656f",
+      "credentials": {
+        "telegramApi": {
+          "id": "MU3JTPoUuT6Zo8BL",
+          "name": "Telegram News Reporter"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## 📰 News Reporter – Agente de contenidos\n\n**Qué hace:** cada día a las 8:00 (hora de Costa Rica) obtiene la noticia de tecnología más reciente de EL PAÍS, la reescribe con IA en tono informativo, cercano y divulgativo, genera una ilustración, la aloja en ImgBB y publica todo en Telegram.\n\n**Flujo:** Trigger → RSS → Filtro → Redactor IA → Imagen → ImgBB → Telegram\n\n**Gestión de errores:** reintentos automáticos, auto-corrección del JSON, fallback sin imagen y workflow de alertas (`09 Alertas de error`).",
+        "height": 192,
+        "width": 2320,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -480,
+        -1184
+      ],
+      "id": "97cd2b69-c462-48c0-8cb6-edc93cdbe570",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## ⏰ Disparadores\n- **Schedule Trigger:** ejecuta el flujo cada día a las 8:00 (America/Costa_Rica). Es el modo producción.\n- **Manual Trigger:** lanza el flujo bajo demanda para pruebas y demostraciones.\n\nAmbos conectan al mismo nodo, así la lógica es una sola.",
+        "height": 208,
+        "width": 336,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -576,
+        -96
+      ],
+      "id": "7e1247e2-f458-42b2-8b8f-4164f5dac116",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "## 📥 Obtención de la noticia\n- **Obtener RSS El País (HTTP Request):** GET al feed RSS de Tecnología de EL PAÍS. Reintenta 3 veces si falla la red.\n- **Parsear XML:** convierte el RSS (XML) a JSON para trabajar con sus campos.\n- **Seleccionar noticia (Code):** descarta otras secciones y contenido patrocinado (/branded/), ordena por fecha, elige la más reciente y limpia el HTML. Si no hay noticias válidas, lanza un error controlado.",
+        "height": 192,
+        "width": 640,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -192,
+        -96
+      ],
+      "id": "156c4007-43e6-4a4c-9e04-efd75b34b69c",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "## 🤖 Redacción con IA\n- **Redactor IA (AI Agent):** resume la noticia en tono informativo, cercano y divulgativo, sin inventar datos, y redacta el prompt de la imagen (en inglés, sin texto, logos ni personas reales).\n- **OpenAI Chat Model (gpt-4o-mini, temperatura 0.5):** rápido y económico; temperatura media para adaptar el tono sin inventar.\n- **salida en JSON (Structured Output Parser):** obliga a devolver titular, resumen, por_que_importa, prompt_imagen y hashtags. Esquema plano (solo textos) para evitar errores de formato. Auto-Fix Format: si el JSON no cumple, el modelo lo corrige.",
+        "height": 240,
+        "width": 672,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        256,
+        -720
+      ],
+      "id": "5888cfec-e8de-4baf-a16b-25fa98f998ac",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {
+        "content": "## 🎨 Imagen\n- **Generar imagen (OpenAI gpt-image-1-mini):** crea una ilustración editorial 1024x1024 a partir del prompt del agente. Si falla tras los reintentos, sale por la rama Error.\n- **Subir imagen ImgBB (HTTP Request):** aloja la imagen y devuelve un enlace público permanente. La API key va en una credencial (Query Auth), no en la URL, para que no quede expuesta al exportar.",
+        "height": 208,
+        "width": 448,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        864,
+        -96
+      ],
+      "id": "52cf654c-8729-4ff5-868d-0d9841fa61db",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "content": "## 🛡️ Gestión de errores\n- **Enviar solo texto (fallback):** si falla la generación o la subida de la imagen, publica la noticia sin imagen. La noticia nunca se pierde.\n- **Reintentos automáticos:** RSS (3), imagen (2), ImgBB (3).\n- **Workflow 09 Alertas de error:** si cualquier nodo falla en producción, un Error Trigger envía a Telegram el nodo, el mensaje de error y el enlace a la ejecución.",
+        "height": 208,
+        "width": 448,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1344,
+        -96
+      ],
+      "id": "36b26026-0831-4ee2-8bf1-6988715a3331",
+      "name": "Sticky Note5"
+    },
+    {
+      "parameters": {
+        "content": "## 📲 Canal de salida: Telegram\n- **Enviar imagen Telegram:** envía la ilustración como archivo, directamente desde Generar imagen, con titular y hashtags como pie de foto.\n- **Enviar resumen Telegram:** envía el resumen, el porqué importa, el enlace público de la imagen (ImgBB) y la fuente original.\n\n**Decisión:** la foto no depende de ImgBB. Enviarla por URL fallaba de forma intermitente porque Telegram no siempre podía descargarla; como archivo es más robusto. ImgBB se usa solo para el enlace.\n\nVan en dos mensajes porque el pie de foto de Telegram admite máximo 1024 caracteres.",
+        "height": 240,
+        "width": 736,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1152,
+        -880
+      ],
+      "id": "27cd19b6-be07-4837-83a1-f61c21e6c415",
+      "name": "Sticky Note6"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "Obtener RSS El País",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Obtener RSS El País",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Obtener RSS El País": {
+      "main": [
+        [
+          {
+            "node": "Parsear XML",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parsear XML": {
+      "main": [
+        [
+          {
+            "node": "Seleccionar noticia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Seleccionar noticia": {
+      "main": [
+        [
+          {
+            "node": "Redactor IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Redactor IA",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "salida en JSON",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "salida en JSON": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Redactor IA",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redactor IA": {
+      "main": [
+        [
+          {
+            "node": "Generar imagen",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generar imagen": {
+      "main": [
+        [
+          {
+            "node": "Subir imagen ImgBB",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Enviar imagen Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar solo texto (fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar imagen Telegram": {
+      "main": [
+        []
+      ]
+    },
+    "Subir imagen ImgBB": {
+      "main": [
+        [
+          {
+            "node": "Enviar resumen Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enviar solo texto (fallback)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "timeSavedMode": "fixed",
+    "errorWorkflow": "fcs8caem8tmPLFyq",
+    "callerPolicy": "workflowsFromSameOwner",
+    "availableInMCP": false,
+    "timeSavedPerExecution": 30
+  },
+  "versionId": "a23587b0-cd32-4be5-88d5-10a756c3c101",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "c07b4837175c9f25db863c711250b6e9f92cdaefee696f7ecced475db5bd16cf"
+  },
+  "nodeGroups": [],
+  "id": "fiMOUkyyi78eSNfq",
+  "tags": []
+}
